@@ -114,32 +114,51 @@
       return prediction.toFixed(4);
     }
 
-    async function init() {
-      const container = document.getElementById('coins');
-      for (const coin of coins) {
-        const section = document.createElement('div');
-        section.className = 'coin';
-        const title = document.createElement('h2');
-        title.textContent = coin.name;
-        const canvas = document.createElement('canvas');
-        const pred = document.createElement('div');
-        pred.className = 'prediction';
+    const updateIntervalMs = 60 * 1000; // fetch new data every minute
 
-        section.appendChild(title);
-        section.appendChild(canvas);
-        section.appendChild(pred);
-        container.appendChild(section);
+    async function addCoin(coin, container) {
+      const section = document.createElement('div');
+      section.className = 'coin';
+      const title = document.createElement('h2');
+      title.textContent = coin.name;
+      const canvas = document.createElement('canvas');
+      const pred = document.createElement('div');
+      pred.className = 'prediction';
 
+      section.appendChild(title);
+      section.appendChild(canvas);
+      section.appendChild(pred);
+      container.appendChild(section);
+
+      let chart;
+
+      async function update() {
         try {
           const data = await fetchData(coin.symbol);
           const labels = data.timestamps.map(ts => new Date(ts * 1000).toLocaleTimeString());
-          createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
+          if (!chart) {
+            chart = createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
+          } else {
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data.prices;
+            chart.update();
+          }
           const p = predictPrice(data.timestamps, data.prices);
           pred.textContent = `10 min prediction: $${p}`;
         } catch (e) {
           pred.textContent = 'Data unavailable';
           console.error('Error fetching data for', coin.symbol, e);
         }
+      }
+
+      await update();
+      setInterval(update, updateIntervalMs);
+    }
+
+    async function init() {
+      const container = document.getElementById('coins');
+      for (const coin of coins) {
+        await addCoin(coin, container);
       }
     }
 
