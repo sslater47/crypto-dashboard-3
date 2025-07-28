@@ -44,7 +44,7 @@
   <div id="coins"></div>
 
   <footer>
-    Price prediction is a simple linear projection from recent data and is for demonstration only. This is not financial advice.
+    Price prediction is a simple linear projection from recent data and is for demonstration only. This is not financial advice. Prediction shown is for 10 minutes ahead.
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -60,7 +60,10 @@
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=5m`;
       const res = await fetch(url);
       const data = await res.json();
-      const result = data.chart.result[0];
+      const result = data.chart && data.chart.result && data.chart.result[0];
+      if (!result || !result.indicators || !result.indicators.quote[0]) {
+        throw new Error('No chart data');
+      }
       return {
         timestamps: result.timestamp,
         prices: result.indicators.quote[0].close
@@ -82,6 +85,7 @@
         },
         options: {
           responsive: true,
+          interaction: { mode: 'nearest', intersect: false },
           scales: {
             x: {
               display: true,
@@ -105,7 +109,7 @@
         totalDelta += prices[i+1] - prices[i];
       }
       const avgDelta = totalDelta / points;
-      const stepsAhead = Math.round(3600 / interval);
+      const stepsAhead = Math.round(600 / interval);
       const prediction = prices[n-1] + avgDelta * stepsAhead;
       return prediction.toFixed(4);
     }
@@ -131,7 +135,7 @@
           const labels = data.timestamps.map(ts => new Date(ts * 1000).toLocaleTimeString());
           createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
           const p = predictPrice(data.timestamps, data.prices);
-          pred.textContent = `1 hour prediction: $${p}`;
+          pred.textContent = `10 min prediction: $${p}`;
         } catch (e) {
           pred.textContent = 'Data unavailable';
           console.error('Error fetching data for', coin.symbol, e);
