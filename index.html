@@ -3,24 +3,143 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Blank Page</title>
+  <title>Crypto Dashboard</title>
   <style>
     body {
       margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      padding: 20px;
+      font-family: Arial, Helvetica, sans-serif;
       background-color: #f0f0f0;
     }
     h1 {
-      color: #888;
+      text-align: center;
+    }
+    .coin {
+      margin: 40px auto;
+      max-width: 800px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    canvas {
+      width: 100% !important;
+      height: 400px !important;
+    }
+    .prediction {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: #555;
+      font-size: 0.9em;
     }
   </style>
 </head>
 <body>
-  <h1>This is a blank page 👋🏻</h1>
+  <h1>Crypto Price Dashboard</h1>
+
+  <div id="coins"></div>
+
+  <footer>
+    Price prediction is a simple linear projection from recent data and is for demonstration only. This is not financial advice.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const coins = [
+      { name: 'Bitcoin', symbol: 'BTC-USD' },
+      { name: 'Ethereum', symbol: 'ETH-USD' },
+      { name: 'XRP', symbol: 'XRP-USD' },
+      { name: 'Loaded Lions', symbol: 'LION-USD' }
+    ];
+
+    async function fetchData(symbol) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=5m`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const result = data.chart.result[0];
+      return {
+        timestamps: result.timestamp,
+        prices: result.indicators.quote[0].close
+      };
+    }
+
+    function createChart(ctx, labels, prices, name) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: name + ' Price (USD)',
+            data: prices,
+            fill: false,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              display: true,
+              ticks: { maxTicksLimit: 6 }
+            },
+            y: {
+              beginAtZero: false
+            }
+          }
+        }
+      });
+    }
+
+    function predictPrice(timestamps, prices) {
+      const n = prices.length;
+      if (n < 2) return 'N/A';
+      const interval = timestamps[n-1] - timestamps[n-2]; // seconds per step
+      const points = Math.min(12, n-1); // roughly last hour for 5m data
+      let totalDelta = 0;
+      for (let i = n - points; i < n - 1; i++) {
+        totalDelta += prices[i+1] - prices[i];
+      }
+      const avgDelta = totalDelta / points;
+      const stepsAhead = Math.round(3600 / interval);
+      const prediction = prices[n-1] + avgDelta * stepsAhead;
+      return prediction.toFixed(4);
+    }
+
+    async function init() {
+      const container = document.getElementById('coins');
+      for (const coin of coins) {
+        const section = document.createElement('div');
+        section.className = 'coin';
+        const title = document.createElement('h2');
+        title.textContent = coin.name;
+        const canvas = document.createElement('canvas');
+        const pred = document.createElement('div');
+        pred.className = 'prediction';
+
+        section.appendChild(title);
+        section.appendChild(canvas);
+        section.appendChild(pred);
+        container.appendChild(section);
+
+        try {
+          const data = await fetchData(coin.symbol);
+          const labels = data.timestamps.map(ts => new Date(ts * 1000).toLocaleTimeString());
+          createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
+          const p = predictPrice(data.timestamps, data.prices);
+          pred.textContent = `1 hour prediction: $${p}`;
+        } catch (e) {
+          pred.textContent = 'Data unavailable';
+          console.error('Error fetching data for', coin.symbol, e);
+        }
+      }
+    }
+
+    init();
+  </script>
 </body>
 </html>
