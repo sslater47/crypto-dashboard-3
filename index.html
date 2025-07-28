@@ -30,6 +30,11 @@
       margin-top: 10px;
       font-weight: bold;
     }
+    .details {
+      margin-top: 5px;
+      color: #333;
+      font-size: 0.9em;
+    }
     footer {
       text-align: center;
       margin-top: 40px;
@@ -57,7 +62,7 @@
     ];
 
     async function fetchData(symbol) {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=5m`;
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m`;
       const res = await fetch(url);
       const data = await res.json();
       const result = data.chart.result[0];
@@ -99,13 +104,13 @@
       const n = prices.length;
       if (n < 2) return 'N/A';
       const interval = timestamps[n-1] - timestamps[n-2]; // seconds per step
-      const points = Math.min(12, n-1); // roughly last hour for 5m data
+      const points = Math.min(60, n-1); // roughly last hour for 1m data
       let totalDelta = 0;
       for (let i = n - points; i < n - 1; i++) {
         totalDelta += prices[i+1] - prices[i];
       }
       const avgDelta = totalDelta / points;
-      const stepsAhead = Math.round(3600 / interval);
+      const stepsAhead = Math.round(600 / interval);
       const prediction = prices[n-1] + avgDelta * stepsAhead;
       return prediction.toFixed(4);
     }
@@ -120,18 +125,30 @@
         const canvas = document.createElement('canvas');
         const pred = document.createElement('div');
         pred.className = 'prediction';
+        const details = document.createElement('div');
+        details.className = 'details';
 
         section.appendChild(title);
         section.appendChild(canvas);
         section.appendChild(pred);
+        section.appendChild(details);
         container.appendChild(section);
 
         try {
           const data = await fetchData(coin.symbol);
           const labels = data.timestamps.map(ts => new Date(ts * 1000).toLocaleTimeString());
-          createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
+          const chart = createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
           const p = predictPrice(data.timestamps, data.prices);
-          pred.textContent = `1 hour prediction: $${p}`;
+          pred.textContent = `10 minute prediction: $${p}`;
+          canvas.onclick = (evt) => {
+            const points = chart.getElementsAtEventForMode(evt, 'nearest', {intersect: true}, true);
+            if (points.length) {
+              const idx = points[0].index;
+              const time = labels[idx];
+              const price = chart.data.datasets[0].data[idx];
+              details.textContent = `Selected: ${time} - $${price.toFixed(4)}`;
+            }
+          };
         } catch (e) {
           pred.textContent = 'Data unavailable';
           console.error('Error fetching data for', coin.symbol, e);
