@@ -1,26 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Blank Page</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Dashboard</title>
   <style>
     body {
+      font-family: Arial, sans-serif;
       margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background-color: #f0f0f0;
+      padding: 20px;
+      background-color: #f5f5f5;
+      line-height: 1.4;
     }
-    h1 {
-      color: #888;
+    .coin {
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    canvas {
+      width: 100% !important;
+      max-width: 600px;
+      height: 300px !important;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0"></script>
 </head>
 <body>
-  <h1>This is a blank page 👋🏻</h1>
+  <h1>Crypto Dashboard</h1>
+  <div id="coins"></div>
+
+  <script>
+    const coins = [
+      { symbol: 'BTC-USD', name: 'BITCOIN' },
+      { symbol: 'ETH-USD', name: 'ETHEREUM' },
+      { symbol: 'XRP-USD', name: 'XRP' },
+      { symbol: 'LIONS-USD', name: 'LOADED LIONS' }
+    ];
+
+    const container = document.getElementById('coins');
+
+    coins.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'coin';
+      div.innerHTML = `
+        <h2>${c.name}</h2>
+        <canvas id="chart-${c.symbol}"></canvas>
+        <p>1 hour prediction: <span id="pred-${c.symbol}">loading...</span></p>
+      `;
+      container.appendChild(div);
+      loadData(c);
+    });
+
+    function loadData(coin) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${coin.symbol}?range=1d&interval=5m`;
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.chart || !data.chart.result) throw new Error('No data');
+          const result = data.chart.result[0];
+          const times = result.timestamp.map(t => new Date(t * 1000));
+          const prices = result.indicators.quote[0].close;
+
+          const ctx = document.getElementById(`chart-${coin.symbol}`).getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: times,
+              datasets: [{
+                label: `${coin.symbol} price`,
+                data: prices,
+                fill: false,
+                borderColor: '#007bff',
+                tension: 0.1
+              }]
+            },
+            options: {
+              scales: {
+                x: {
+                  type: 'time',
+                  time: {
+                    unit: 'hour'
+                  }
+                },
+                y: {
+                  beginAtZero: false,
+                  title: {
+                    display: true,
+                    text: 'USD'
+                  }
+                }
+              }
+            }
+          });
+
+          if (prices.length >= 2) {
+            const diff = prices[prices.length - 1] - prices[prices.length - 2];
+            const prediction = prices[prices.length - 1] + diff;
+            document.getElementById(`pred-${coin.symbol}`).textContent = prediction.toFixed(2) + ' USD';
+          } else {
+            document.getElementById(`pred-${coin.symbol}`).textContent = 'N/A';
+          }
+        })
+        .catch(err => {
+          document.getElementById(`pred-${coin.symbol}`).textContent = 'Data not available';
+          console.error('Error loading data for ' + coin.symbol, err);
+        });
+    }
+  </script>
 </body>
 </html>
