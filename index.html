@@ -30,6 +30,11 @@
       margin-top: 10px;
       font-weight: bold;
     }
+    .info {
+      margin-top: 10px;
+      color: #333;
+      font-size: 0.9em;
+    }
     footer {
       text-align: center;
       margin-top: 40px;
@@ -95,7 +100,7 @@
       });
     }
 
-    function predictPrice(timestamps, prices) {
+    function predictPrice(timestamps, prices, minutesAhead = 10) {
       const n = prices.length;
       if (n < 2) return 'N/A';
       const interval = timestamps[n-1] - timestamps[n-2]; // seconds per step
@@ -105,7 +110,7 @@
         totalDelta += prices[i+1] - prices[i];
       }
       const avgDelta = totalDelta / points;
-      const stepsAhead = Math.round(3600 / interval);
+      const stepsAhead = Math.round((minutesAhead * 60) / interval);
       const prediction = prices[n-1] + avgDelta * stepsAhead;
       return prediction.toFixed(4);
     }
@@ -120,18 +125,30 @@
         const canvas = document.createElement('canvas');
         const pred = document.createElement('div');
         pred.className = 'prediction';
+        const info = document.createElement('div');
+        info.className = 'info';
 
         section.appendChild(title);
         section.appendChild(canvas);
         section.appendChild(pred);
+        section.appendChild(info);
         container.appendChild(section);
 
         try {
           const data = await fetchData(coin.symbol);
           const labels = data.timestamps.map(ts => new Date(ts * 1000).toLocaleTimeString());
-          createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
-          const p = predictPrice(data.timestamps, data.prices);
-          pred.textContent = `1 hour prediction: $${p}`;
+          const chart = createChart(canvas.getContext('2d'), labels, data.prices, coin.name);
+          const p = predictPrice(data.timestamps, data.prices, 10);
+          pred.textContent = `10 minute prediction: $${p}`;
+          canvas.addEventListener('click', (evt) => {
+            const points = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+            if (points.length) {
+              const point = points[0];
+              const label = chart.data.labels[point.index];
+              const value = chart.data.datasets[point.datasetIndex].data[point.index];
+              info.textContent = `Selected: ${label} - $${value}`;
+            }
+          });
         } catch (e) {
           pred.textContent = 'Data unavailable';
           console.error('Error fetching data for', coin.symbol, e);
